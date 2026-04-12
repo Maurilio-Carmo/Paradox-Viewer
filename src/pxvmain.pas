@@ -8,7 +8,8 @@ uses
   Classes, SysUtils, FileUtil,
   LCLVersion, LConvEncoding,
   Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls, ComCtrls, ShellCtrls, Grids,
-  DB, DBGrids, DBCtrls, ParadoxDS, sqlite3conn, sqldb, sqlite3dyn;
+  DB, DBGrids, DBCtrls, ParadoxDS, sqlite3conn, sqldb, sqlite3dyn,
+  pxvExport;
 
 type
 
@@ -17,6 +18,7 @@ type
   TMainForm = class(TForm)
     ApplicationProperties: TApplicationProperties;
     btnExportSQLite3: TButton;
+    cbAllTables: TCheckBox;
     cbAutoSizeCols: TCheckBox;
     cmbInputEncoding: TComboBox;
     DataSource: TDataSource;
@@ -58,7 +60,6 @@ type
     function ShellTreeViewSortCompare(Item1, Item2: TFileItem): integer;
   private
     ParadoxDataset: TParadoxDataset;
-    procedure ExportToSQLite3(AsCombinedFile: Boolean);
     function GetInputEncoding: String;
     procedure OpenParadoxFile(const AFileName: string);
     procedure UpdateGrid;
@@ -78,17 +79,60 @@ implementation
 uses
   TypInfo, LazFileUtils;
 
+{$I pxvmain_shell.inc}
+{$I pxvmain_blob.inc}
+{$I pxvmain_grid.inc}
+
 const
   PROGRAM_NAME = 'PARADOX Viewer';
 
-{ TMainForm }
+{ TMainForm — core form logic }
 
 procedure TMainForm.btnExportSQLite3Click(Sender: TObject);
+var
+  Files      : TStringList;
+  SavedName  : String;
+  i          : Integer;
+  Combined   : Boolean;
+  Exported   : Integer;
+  Errors     : Integer;
 begin
-  if rbIndividualFiles.Checked then
-    ExportToSQLite3(false);
-  if rbCombinedFile.Checked then
-    ExportToSQLite3(true);
+  Combined := rbCombinedFile.Checked;
+
+  if cbAllTables.Checked and (ParadoxDataset.TableName <> '') then
+  begin
+    Files    := FindAllFiles(ExtractFileDir(ParadoxDataset.TableName), '*.db', False);
+    Exported := 0;
+    Errors   := 0;
+    try
+      SavedName := ParadoxDataset.TableName;
+      for i := 0 to Files.Count - 1 do
+      begin
+        try
+          ParadoxDataset.Close;
+          ParadoxDataset.TableName     := Files[i];
+          ParadoxDataset.InputEncoding := GetInputEncoding;
+          ParadoxDataset.Open;
+          ExportToSQLite3(ParadoxDataset, SQLite3Connection, SQLTransaction, Combined, {ASilent=}True);
+          Inc(Exported);
+        except
+          Inc(Errors);
+        end;
+      end;
+      if Errors = 0 then
+        ShowMessage('Exportação concluída: ' + IntToStr(Exported) + ' tabela(s) exportada(s).')
+      else
+        ShowMessage('Exportação concluída: ' + IntToStr(Exported) + ' tabela(s) exportada(s), ' +
+                    IntToStr(Errors) + ' ignorada(s) por erro.');
+      OpenParadoxFile(SavedName);
+    finally
+      Files.Free;
+    end;
+  end
+  else
+  begin
+    ExportToSQLite3(ParadoxDataset, SQLite3Connection, SQLTransaction, Combined);
+  end;
 end;
 
 procedure TMainForm.cbAutoSizeColsChange(Sender: TObject);
@@ -107,174 +151,32 @@ begin
     OpenParadoxFile(ParadoxDataset.TableName);
 end;
 
-procedure TMainForm.ExportToSQLite3(AsCombinedFile: Boolean);
-var
-  sql: String;
-  F: TField;
-  dt: String;
-  i: Integer;
-  s: String;
-  firstField: Boolean;
-  P: array of variant;
-  query: TSQLQuery;
-  dbName: String;
-  tblName: String;
-begin
-  SQLite3Connection.Connected := false;
-
-  tblName := ChangeFileExt(ExtractFileName(ParadoxDataset.TableName), '');
-  if AsCombinedFile then begin
-    dbName := ExtractFileDir(ParadoxDataset.TableName) + '.sqlite';
-    SQLite3Connection.DatabaseName := dbName;
-    SQLite3Connection.Open;
-    SQLTransaction.Active := true;
-    sql := 'DROP TABLE IF EXISTS "' + tblName + '"';
-    SQLite3Connection.ExecuteDirect(sql);
-  end else begin
-    dbName := ChangeFileExt(ExtractFileName(ParadoxDataset.TableName), '.sqlite');
-    if FileExists(dbName) then
-      DeleteFile(dbName);
-    SQLite3Connection.DatabaseName := dbName;
-    SQLite3Connection.Open;
-    SQLTransaction.Active := true;
-  end;
-
-  sql := Format('CREATE TABLE "%s" (', [tblName]);
-  firstField := True;
-  for i := 0 to ParadoxDataset.FieldCount-1 do begin
-    F := ParadoxDataset.Fields[i];
-    if F.DataType in [ftSmallInt, ftInteger, ftWord, ftLargeInt] then
-      dt := 'INTEGER'
-    else if F.DataType in [ftFloat] then
-      dt := 'REAL'
-    else if F.DataType in [ftDateTime] then
-      dt := 'TEXT'
-    else if F.DataType in [ftDate] then
-      dt := 'TEXT'
-    else if F.DataType in [ftTime] then
-      dt := 'TEXT'
-    else if F.DataType = ftBoolean then
-      dt := 'BOOL'
-    else if F.DataType = ftMemo then
-      dt := 'TEXT'
-    else if F.DataType in [ftString, ftWideString] then begin
-      if F.Size > 0 then
-        dt := 'VARCHAR(' + IntToStr(F.Size) + ')'
-      else
-        dt := 'TEXT'
-    end
-    else if F.DataType in [ftBlob, ftGraphic, ftBytes, ftBCD] then
-      dt := 'BLOB'
-    else
-      Continue;
-
-    if not firstField then sql := sql + ',';
-    firstField := False;
-    sql := sql + Format('"%s" %s', [F.FieldName, dt]);
-
-    // Primary key (consisting of single field) ?
-    if (i = 0) and (ParadoxDataset.PrimaryKeyFieldCount = 1) then
-      sql := sql + ' PRIMARY KEY'
-  end;
-
-  // Primary key (constisting of several fields)
-  if (ParadoxDataset.PrimaryKeyFieldCount > 1) then begin
-    sql := sql + ', PRIMARY KEY ("' + ParadoxDataset.Fields[0].FieldName + '"';
-    for i := 1 to ParadoxDataset.PrimaryKeyFieldCount-1 do
-      sql := sql + ',"' + ParadoxDataset.Fields[i].FieldName + '"';
-    sql := sql + ')';
-  end;
-
-  sql := sql + ');';
-  SQLite3Connection.ExecuteDirect(sql);
-  SQLTransaction.Commit;
-
-  query := TSQLQuery.Create(nil);
-  try
-    query.Database := SQLite3Connection;
-    query.Transaction := SQLTransaction;  // FIX: sem isso causa ACCESS VIOLATION no ExecSQL
-    //query.Options := query.Options + [sqoAutoApplyUpdates, sqoAutoCommit];
-    sql := Format('INSERT INTO "%s" ("%s"', [tblName, ParadoxDataset.Fields[0].FieldName]);
-    s := 'VALUES (:P0';
-    for i := 1 to ParadoxDataset.FieldCount-1 do begin
-      sql := sql + ',"' + ParadoxDataset.Fields[i].FieldName + '"';
-      s := s + ',:P' + IntToStr(i);
-    end;
-    query.SQL.Text := sql + ') ' + s + ');';
-    ParadoxDataset.First;
-    while not ParadoxDataset.EoF do begin
-      for i:=0 to ParadoxDataset.Fieldcount-1 do begin
-        F := ParadoxDataset.Fields[i];
-        if F.DataType in [ftMemo, ftString, ftWideString] then
-          query.Params.ParamByName('P' + IntToStr(i)).AsString := F.AsString
-        else if F.IsNull then
-          query.Params.ParamByName('P' + IntToStr(i)).Clear
-        else if F.DataType = ftDate then
-          query.Params.ParamByName('P' + IntToStr(i)).AsString := FormatDateTime('yyyy-mm-dd', F.AsDateTime)
-        else if F.DataType = ftTime then
-          query.Params.ParamByName('P' + IntToStr(i)).AsString := FormatDateTime('hh:nn:ss', F.AsDateTime)
-        else if F.DataType = ftDateTime then
-          query.Params.ParamByName('P' + IntToStr(i)).AsString := FormatDateTime('yyyy-mm-dd hh:nn:ss', F.AsDateTime)
-        else
-          query.Params.ParamByName('P' + IntToStr(i)).Value := F.Value;
-      end;
-      query.ExecSQL;
-      ParadoxDataset.Next;
-    end;
-    SQLTransaction.Commit;
-  finally
-    query.Free;
-  end;
-
-  if AsCombinedFile then
-    ShowMessage('Table "' + tblName + '" successfully added to SQLite3 database "' + dbname + '"')
-  else
-    ShowMessage('SQLite3 database "' + dbname + '" created successfully.');
-end;
-
-procedure TMainForm.FormActivate(Sender: TObject);
-var
-  fn: String;
-begin
-  if ParamCount > 0 then begin
-    fn := ParamStr(1);
-    if DirectoryExists(fn) then
-      ShellTreeView.Path := fn
-    else
-    begin
-      ShellTreeview.Path := ExtractFilepath(fn);
-      OpenParadoxFile(fn);
-    end;
-  end;
-end;
-
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   Caption := PROGRAM_NAME;
   ShellListview.Mask := '*.db';
 
-  // Compatibility with Linux/mac
+  // Compatibility with Linux/Mac
   {$IFDEF MSWINDOWS}
   {$IF LCL_FullVersion >= 2010000}
-  ShellTreeView.Images := nil;
+  ShellTreeView.Images     := nil;
   ShellListView.SmallImages := nil;
   {$IFEND}
   {$ENDIF}
 
-  // The following properties are set at runtime after compilation compatibility
-  // test with Laz 2.0.8
+  // Properties set at runtime for compatibility with Laz 2.0.8
   {$IF LCL_FullVersion >= 4000000}
-  ShellTreeView.FilesortType := fstCustom;
-  ShellTreeView.OnSortCompare := @ShellTreeViewSortCompare;
-  DBMemo.WantReturns := false;
-  ImageList.Scaled := true;
+  ShellTreeView.FilesortType        := fstCustom;
+  ShellTreeView.OnSortCompare       := @ShellTreeViewSortCompare;
+  DBMemo.WantReturns                := false;
+  ImageList.Scaled                  := true;
   SQLite3Connection.AlwaysUseBigInt := false;
   {$ENDIF}
 
-  // Avoid installation of the component from CCR
-  ParadoxDataset := TParadoxDataset.Create(self);
+  // Create TParadoxDataset at runtime — avoids installing the CCR package
+  ParadoxDataset             := TParadoxDataset.Create(self);
   ParadoxDataset.AfterScroll := @ParadoxDatasetAfterScroll;
-  DataSource.Dataset := ParadoxDataset;
+  DataSource.Dataset         := ParadoxDataset;
 end;
 
 function TMainForm.GetInputEncoding: String;
@@ -283,8 +185,7 @@ var
 begin
   if (cmbInputEncoding.ItemIndex in [0, -1]) then
     Result := ''
-  else
-  begin
+  else begin
     sa := cmbInputEncoding.Items[cmbInputEncoding.ItemIndex].Split(' ');
     Result := Lowercase(StringReplace(sa[0], '-', '', [rfReplaceAll]));
   end;
@@ -293,17 +194,16 @@ end;
 procedure TMainForm.OpenParadoxFile(const AFileName: String);
 begin
   ParadoxDataset.Close;
-  DBMemo.DataField := '';
+  DBMemo.DataField  := '';
   DBImage.DataField := '';
 
-  ParadoxDataset.TableName := AFileName;
+  ParadoxDataset.TableName     := AFileName;
   ParadoxDataset.InputEncoding := GetInputEncoding;
   ParadoxDataset.Open;
   UpdateMemo;
   UpdateImage;
   UpdateGrid;
 
-  // Update information in form
   Caption := Format('%s - %s', [PROGRAM_NAME, ExtractFileName(AFilename)]);
 end;
 
@@ -313,117 +213,4 @@ begin
   UpdateImage;
 end;
 
-procedure TMainForm.ShellListViewSelectItem(Sender: TObject; Item: TListItem;
-  Selected: Boolean);
-var
-  fn: String;
-begin
-  if Selected then
-  begin
-    fn := ShellListview.GetPathFromItem(ShellListview.Selected);
-    ShellTreeview.MakeSelectionVisible;
-    OpenParadoxFile(fn);
-  end;
-end;
-
-procedure TMainForm.ShellTreeViewGetImageIndex(Sender: TObject; Node: TTreeNode);
-begin
-  Node.ImageIndex := 0;
-end;
-
-procedure TMainForm.ShellTreeViewGetSelectedIndex(Sender: TObject; Node: TTreeNode);
-begin
-  Node.SelectedIndex := 1;
-end;
-
-// from: https://forum.lazarus.freepascal.org/index.php/topic,61347.msg462091.html
-function TMainForm.ShellTreeViewSortCompare(Item1, Item2: TFileItem): integer;
-begin
-  // Make sure that folders are moved to the top
-  Result := ord(Item2.isFolder) - ord(Item1.isFolder);
-  // Move folders beginning with underscore to the top
-  if Result = 0 then
-    if (pos('_', Item1.FileInfo.Name) = 1) or (pos('_', Item2.FileInfo.Name) = 1) then
-      Result := AnsiCompareText(Item1.FileInfo.Name, Item2.FileInfo.Name)
-    else
-      Result := CompareText(Item1.FileInfo.Name, Item2.FileInfo.Name);
-end;
-
-procedure TMainForm.UpdateGrid;
-var
-  i, j: Integer;
-begin
-  Grid.RowCount := ParadoxDataset.FieldCount + 1;
-  j := 1;
-  for i:=0 to ParadoxDataset.FieldCount-1 do begin
-    Grid.Cells[0, j] := IntToStr(i);
-    Grid.Cells[1, j] := ParadoxDataset.Fields[i].FieldName;
-    Grid.Cells[2, j] := GetEnumName(TypeInfo(TFieldType), integer(ParadoxDataset.Fields[i].DataType));
-    Grid.Cells[3, j] := IntToStr(ParadoxDataset.Fields[i].Size);
-    Grid.Cells[4, j] := BoolToStr(ParadoxDataset.Fields[i].Required, true);
-    inc(j);
-  end;
-end;
-
-procedure TMainForm.UpdateImage;
-var
-  GF: TField;
-  i: Integer;
-begin
-  GF := nil;
-  for i := 0 to ParadoxDataset.FieldCount-1 do
-    if ParadoxDataset.Fields[i].Datatype = ftGraphic then
-    begin
-      GF := ParadoxDataset.Fields[i];
-      break;
-    end;
-  if GF <> nil then
-  begin
-    DBImage.DataField := GF.FieldName;
-    DBImage.Show;
-    BLOBPanel.Show;
-    BLOBSplitter.Show;
-    BLOBSplitter.Top := 0;
-    ImageSplitter.Visible := DBMemo.Visible;
-    ImageSplitter.Left := Width;
-  end else
-  begin
-    DBImage.Hide;
-    ImageSplitter.Hide;
-    BLOBPanel.Visible := DBMemo.Visible;
-    BLOBSplitter.Visible := BLOBPanel.Visible;
-  end;
-end;
-
-procedure TMainForm.UpdateMemo;
-var
-  MF: TField;
-  i: Integer;
-begin
-  MF := nil;
-  for i:=0 to ParadoxDataset.FieldCount-1 do
-    if ParadoxDataset.Fields[i].DataType = ftMemo then
-    begin
-      MF := ParadoxDataset.Fields[i];
-      break;
-    end;
-  if MF <> nil then
-  begin
-    DBMemo.DataField := MF.FieldName;
-    DBMemo.Show;
-    BLOBPanel.Show;
-    BLOBSplitter.Show;
-    BLOBSplitter.Top := 0;
-    ImageSplitter.Visible := DBImage.Visible;
-    ImageSplitter.Left := Width;
-  end else
-  begin
-    ImageSplitter.Hide;
-    DBMemo.Hide;
-    BLOBPanel.Visible := DBImage.Visible;
-    BLOBSplitter.Visible := BLOBPanel.Visible;
-  end;
-end;
-
 end.
-
