@@ -238,7 +238,7 @@ object MainForm: TMainForm
             Top = 4
             Width = 117
             BorderSpacing.Left = 12
-            Caption = 'Ajustar colunas automaticamente'
+            Caption = 'Ajustar colunas'
             Checked = True
             State = cbChecked
             TabOrder = 2

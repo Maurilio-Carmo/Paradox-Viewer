@@ -17,7 +17,7 @@ O **ParadoxViewer** é uma aplicação desktop somente leitura para visualizaç�
 - **Exportação para SQLite3**: Exporta a tabela aberta para um arquivo `.sqlite` individual ou em um arquivo combinado com o nome da pasta
 - **Suporte a BLOB**: Exibe campos do tipo `Memo` (texto) e `Graphic` (imagem) em painéis dedicados, atualizados conforme o registro ativo
 - **Codificação de entrada**: Suporte a dezenas de páginas de código (CP1250, CP1252, ISO-8859, KOI8, etc.) com detecção automática
-- **Auto-dimensionamento de colunas**: Opção para ajustar automaticamente a largura das colunas ao conteúdo
+- **Ajustar colunas**: Opção para ajustar a largura das colunas ao conteúdo
 - **Argumento via linha de comando**: Aceita caminho de arquivo ou diretório como argumento ao iniciar, abrindo diretamente o arquivo ou navegando para a pasta
 - **Somente leitura**: Nenhuma alteração é permitida nos arquivos Paradox originais
 
