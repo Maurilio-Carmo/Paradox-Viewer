@@ -1,0 +1,127 @@
+# =============================================================================
+# FREE PASCAL / LAZARUS
+# =============================================================================
+
+# Binários compilados
+*.exe
+*.dll
+!sqlite3.dll
+
+# Arquivos objeto e units compiladas
+*.o
+*.or
+*.ppu
+*.a
+*.lfwp
+
+# Diretório de saída do compilador
+lib/
+units/
+
+# Arquivos gerados pelo compilador
+*.compiled
+*.rst
+*.rsj
+
+# Arquivos de backup automático do Lazarus/editor
+backup/
+*.bak
+*.~*
+*~
+
+# Sessão da IDE (estado por máquina: abas abertas, breakpoints, etc.)
+*.lps
+
+# Arquivo de histórico de build
+*.mps
+
+# Cross-compilation / pacotes locais
+*.lpk.bak
+*.lpi.bak
+
+# =============================================================================
+# WINDOWS
+# =============================================================================
+
+# Arquivos de sistema
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Arquivos temporários
+*.tmp
+*.temp
+~$*
+
+# =============================================================================
+# EDITORES E IDEs
+# =============================================================================
+
+# VS Code
+.vscode/
+
+# JetBrains (Rider, etc.)
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*#
+.#*
+\#*#
+
+# Notepad++
+nppBackup/
+
+# =============================================================================
+# SISTEMA OPERACIONAL
+# =============================================================================
+
+# macOS (caso alguém compile no Mac)
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# LOGS E DIAGNÓSTICO
+# =============================================================================
+
+*.log
+*.stackdump
+*.crash
+
+# =============================================================================
+# DISTRIBUIÇÃO / RELEASE
+# =============================================================================
+
+# Artefatos de empacotamento
+dist/
+release/
+*.zip
+*.tar.gz
+*.7z
+*.rar
+
+.claude
