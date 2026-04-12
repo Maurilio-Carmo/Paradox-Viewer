@@ -6,7 +6,7 @@ O **ParadoxViewer** é uma aplicação desktop somente leitura para visualizaç�
 
 > **Pronto para usar**: o repositório já inclui o executável `pxView.exe` compilado para Windows. Basta clonar e executar — nenhuma instalação adicional é necessária (exceto `deps/sqlite3.dll` na mesma pasta para exportação).
 
-![ParadoxViewer](src/assets/paradoxViewer.png)
+![ParadoxViewer](src/assets/Paradox-Viewer.png)
 
 ---
 
