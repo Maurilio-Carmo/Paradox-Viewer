@@ -103,13 +103,13 @@ begin
         Result := True;
       end;
     pxfShort:
-      begin
+      if si <> Low(SmallInt) then begin   // 0x8000 = NULL in Paradox
         if Assigned(Buffer) then
           Move(si, Buffer^, SizeOf(SmallInt));
         Result := True;
       end;
     pxfLong, pxfAutoInc:
-      begin
+      if int <> Low(LongInt) then begin   // 0x80000000 = NULL in Paradox
         if Assigned(Buffer) then
           Move(int, Buffer^, SizeOf(LongInt));
         Result := True;
@@ -134,7 +134,7 @@ begin
         Result := true;  // must be outside "if Assigned" — otherwise checkboxes render wrong
       end;
     pxfTime:
-      begin
+      if int <> Low(LongInt) then begin   // 0x80000000 = NULL in Paradox
         if Assigned(Buffer) then
           Move(int, Buffer^, SizeOf(LongInt));
         Result := True;
