@@ -4,15 +4,7 @@
 
 O **ParadoxViewer** é uma aplicação desktop somente leitura para visualização de arquivos de banco de dados **Paradox** — um formato legado amplamente utilizado em sistemas dos anos 80 e 90. Com ele, é possível navegar pelo sistema de arquivos, inspecionar registros e estrutura de campos, e exportar os dados para **SQLite3** para uso em sistemas modernos.
 
-## ✔️ Acesso Imediato
-
-Baixe o executável pronto — sem instalação ou dependências adicionais.
-
-**[⬇️ Download pxView.exe](https://github.com/Maurilio-Carmo/Paradox-Viewer/releases/latest)**
-
-`sqlite3.dll` já está incluída. Basta extrair e executar.
-
----
+> **Pronto para usar**: o repositório já inclui o executável compilado em `dist/pxView.exe`. Basta clonar e executar — nenhuma instalação adicional é necessária (`dist/sqlite3.dll` já está incluída na mesma pasta para exportação).
 
 ## ☕ Apoie o Projeto
 
