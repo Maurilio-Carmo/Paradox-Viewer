@@ -112,6 +112,8 @@ begin
         LogFmt('Tabela [%d/%d]: %s', [i + 1, Files.Count, ExtractFileName(Files[i])]);
         try
           ParadoxDataset.Close;
+          DBMemo.DataField  := '';   // evita "Field not found" se tabela anterior tinha campo memo/imagem
+          DBImage.DataField := '';
           ParadoxDataset.TableName     := Files[i];
           ParadoxDataset.InputEncoding := GetInputEncoding;
           ParadoxDataset.Open;
