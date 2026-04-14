@@ -4,7 +4,7 @@
 
 O **ParadoxViewer** é uma aplicação desktop somente leitura para visualização de arquivos de banco de dados **Paradox** — um formato legado amplamente utilizado em sistemas dos anos 80 e 90. Com ele, é possível navegar pelo sistema de arquivos, inspecionar registros e estrutura de campos, e exportar os dados para **SQLite3** para uso em sistemas modernos.
 
-> **Pronto para usar**: o repositório já inclui o executável `pxView.exe` compilado para Windows. Basta clonar e executar — nenhuma instalação adicional é necessária (exceto `deps/sqlite3.dll` na mesma pasta para exportação).
+> **Pronto para usar**: o repositório já inclui o executável compilado em `dist/pxView.exe`. Basta clonar e executar — nenhuma instalação adicional é necessária (`dist/sqlite3.dll` já está incluída na mesma pasta para exportação).
 
 ![ParadoxViewer](src/assets/Paradox-Viewer.png)
 
@@ -15,6 +15,7 @@ O **ParadoxViewer** é uma aplicação desktop somente leitura para visualizaç�
 - **Visualização de dados**: Exibe os registros em um `DBGrid` com navegação via `DBNavigator` (primeiro, anterior, próximo, último)
 - **Estrutura de campos**: Listagem completa de todos os campos da tabela com índice, nome, tipo, tamanho e obrigatoriedade
 - **Exportação para SQLite3**: Exporta a tabela aberta para um arquivo `.sqlite` individual ou em um arquivo combinado com o nome da pasta
+- **Exportação em lote**: Exporta todos os arquivos `.db` da pasta de uma vez, com log detalhado em `pxView.log`
 - **Suporte a BLOB**: Exibe campos do tipo `Memo` (texto) e `Graphic` (imagem) em painéis dedicados, atualizados conforme o registro ativo
 - **Codificação de entrada**: Suporte a dezenas de páginas de código (CP1250, CP1252, ISO-8859, KOI8, etc.) com detecção automática
 - **Ajustar colunas**: Opção para ajustar a largura das colunas ao conteúdo
@@ -33,10 +34,16 @@ ParadoxViewer/
 ├── pxView.lpr              # Entry point — inicialização da aplicação
 ├── pxView.res              # Resources compilados (ícone embutido)
 │
+├── dist/                   # Saída de compilação (gerada automaticamente)
+│   ├── pxView.exe          # Executável compilado
+│   ├── sqlite3.dll         # Dependência de runtime para exportação SQLite3
+│   └── pxView.log          # Log gerado na exportação em lote
+│
 ├── src/
 │   ├── pxTypes.pas         # Constantes e tipos do formato Paradox (.db)
 │   ├── paradoxds.pas       # TParadoxDataset — leitura de arquivos Paradox (CCR)
 │   ├── pxvExport.pas       # Lógica de exportação para SQLite3
+│   ├── pxvLog.pas          # Sistema de log em arquivo (pxView.log)
 │   ├── pxvmain.pas         # Form principal — lógica central da UI
 │   ├── pxvmain.lfm         # Layout visual do form (designer Lazarus)
 │   │
@@ -54,12 +61,7 @@ ParadoxViewer/
 │       ├── pxvmain_blob.inc       # UpdateImage, UpdateMemo
 │       └── pxvmain_grid.inc       # UpdateGrid
 │
-├── deps/
-│   └── sqlite3.dll         # Dependência de runtime para exportação SQLite3
-│
-└── docs/
-    └── screenshot/
-        └── paradoxviewer.png
+└── lib/                    # Arquivos objeto intermediários (gerados pelo compilador)
 ```
 
 ---
@@ -97,16 +99,16 @@ File > Open Project → selecione pxView.lpi
 | Apenas compilar | **Ctrl+F9** |
 | Executar com debug (breakpoints) | **F9** após inserir breakpoints |
 
-O executável `pxView.exe` será gerado na raiz do projeto.
+O executável `pxView.exe` e a `sqlite3.dll` serão gerados automaticamente na pasta `dist/`. Um comando pós-build copia a `sqlite3.dll` para `dist/` após cada compilação.
 
 ### 4. Usar via linha de comando *(opcional)*
 
 ```bash
 # Abrir diretamente um arquivo Paradox
-pxView.exe "C:\MeusBancos\clientes.db"
+dist\pxView.exe "C:\MeusBancos\clientes.db"
 
 # Navegar para um diretório ao iniciar
-pxView.exe "C:\MeusBancos"
+dist\pxView.exe "C:\MeusBancos"
 ```
 
 ---
@@ -120,6 +122,25 @@ Ao abrir um arquivo Paradox, o botão **"Exportar para SQLite3"** fica disponív
 | **Arquivo único** | Adiciona a tabela a um arquivo `.sqlite` com o nome da pasta pai. Útil para reunir várias tabelas de um mesmo banco em um único arquivo. |
 | **Arquivos individuais** | Cria um arquivo `.sqlite` individual com o mesmo nome do arquivo `.db` original. |
 | **Todas as tabelas** | Exporta automaticamente todos os arquivos `.db` encontrados na pasta da tabela aberta, respeitando o modo escolhido (arquivo único ou individual). Tabelas sem registros também são exportadas — a estrutura de colunas é sempre criada. |
+
+### Log de exportação
+
+Durante a exportação em lote, um arquivo `pxView.log` é gerado na mesma pasta do executável com o registro de cada tabela processada:
+
+```
+=== Exportação SQLite3 — 42 arquivo(s) encontrado(s) — 2026-04-14 10:30:00 ===
+[10:30:00] Tabela [1/42]: clientes.db
+[10:30:00]   CREATE TABLE com 12 campo(s) (de 12 no arquivo)
+[10:30:00]   OK
+[10:30:01] Tabela [2/42]: documentos.db
+[10:30:01]   Campo ignorado: "foto" (tipo ftGraphic não suportado para SQLite)
+[10:30:01]   CREATE TABLE com 8 campo(s) (de 9 no arquivo)
+[10:30:01]   OK
+...
+[10:30:10] Resultado: 40 exportada(s), 2 ignorada(s)
+```
+
+Se houver erros, o caminho do log é exibido na mensagem de conclusão.
 
 ### Mapeamento de tipos
 
@@ -149,7 +170,7 @@ Chaves primárias simples e compostas são exportadas corretamente como `PRIMARY
 ## ⚠️ Atenção
 
 - **Somente leitura**: O ParadoxViewer não permite editar ou salvar alterações nos arquivos `.db` originais
-- **sqlite3.dll**: O arquivo em `deps/sqlite3.dll` deve estar na mesma pasta que o executável para que a exportação funcione corretamente no Windows
+- **sqlite3.dll**: O arquivo `dist/sqlite3.dll` deve estar na mesma pasta que o executável para que a exportação funcione corretamente no Windows
 - **Compatibilidade**: Testado em Windows 32-bit e 64-bit. Outros sistemas operacionais não foram testados, mas devem funcionar com o Lazarus configurado para a plataforma correspondente
 
 ---
