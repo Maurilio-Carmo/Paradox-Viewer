@@ -9,7 +9,7 @@ uses
   LCLVersion, LConvEncoding,
   Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls, ComCtrls, ShellCtrls, Grids,
   DB, DBGrids, DBCtrls, ParadoxDS, sqlite3conn, sqldb, sqlite3dyn,
-  pxvExport;
+  pxvExport, pxvLog;
 
 type
 
@@ -104,26 +104,35 @@ begin
     Files    := FindAllFiles(ExtractFileDir(ParadoxDataset.TableName), '*.db', False);
     Exported := 0;
     Errors   := 0;
+    LogNewSession('Exportação SQLite3 — ' + IntToStr(Files.Count) + ' arquivo(s) encontrado(s)');
     try
       SavedName := ParadoxDataset.TableName;
       for i := 0 to Files.Count - 1 do
       begin
+        LogFmt('Tabela [%d/%d]: %s', [i + 1, Files.Count, ExtractFileName(Files[i])]);
         try
           ParadoxDataset.Close;
           ParadoxDataset.TableName     := Files[i];
           ParadoxDataset.InputEncoding := GetInputEncoding;
           ParadoxDataset.Open;
           ExportToSQLite3(ParadoxDataset, SQLite3Connection, SQLTransaction, Combined, {ASilent=}True);
+          Log('  OK');
           Inc(Exported);
         except
-          Inc(Errors);
+          on E: Exception do
+          begin
+            LogError('  Ignorada', E.Message);
+            Inc(Errors);
+          end;
         end;
       end;
+      LogFmt('Resultado: %d exportada(s), %d ignorada(s)', [Exported, Errors]);
       if Errors = 0 then
         ShowMessage('Exportação concluída: ' + IntToStr(Exported) + ' tabela(s) exportada(s).')
       else
         ShowMessage('Exportação concluída: ' + IntToStr(Exported) + ' tabela(s) exportada(s), ' +
-                    IntToStr(Errors) + ' ignorada(s) por erro.');
+                    IntToStr(Errors) + ' ignorada(s) por erro.' + LineEnding +
+                    'Veja o log em: ' + LogFilePath);
       OpenParadoxFile(SavedName);
     finally
       Files.Free;
