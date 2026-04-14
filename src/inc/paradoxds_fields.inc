@@ -7,6 +7,7 @@ var
   FNamesStart: PChar;
   fname: String;
   offs: LongInt;
+  origLen: Integer;
 begin
   FieldDefs.Clear;
   F := FFieldInfoPtr;                  { begin with the first field identifier }
@@ -21,6 +22,7 @@ begin
 
   for i := 1 to FHeader^.NumFields do
   begin
+    origLen := StrLen(FNamesStart);   // advance by ORIGINAL byte length, not UTF-8 expanded length
     fname := ConvertEncoding(StrPas(FNamesStart), GetInputEncoding, GetTargetEncoding);
     case F^.fType of
       pxfAlpha:       FieldDefs.Add(fname, ftString,   F^.fSize);
@@ -47,7 +49,7 @@ begin
       Offset := offs;
     end;
     offs := offs + F^.fSize;
-    inc(FNamesStart, Length(fname) + 1);
+    inc(FNamesStart, origLen + 1);
     inc(F);
   end;
 end;
