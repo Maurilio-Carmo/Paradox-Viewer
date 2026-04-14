@@ -24,7 +24,7 @@ uses
 
 function LogFilePath: String;
 begin
-  Result := ExtractFilePath(Application.ExeName) + 'log.txt';
+  Result := ExtractFilePath(Application.ExeName) + 'pxView.log';
 end;
 
 procedure LogLine(const ALine: String);
