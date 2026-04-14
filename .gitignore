@@ -5,6 +5,7 @@
 # Binários compilados
 *.exe
 *.dll
+!pxView.exe
 !sqlite3.dll
 
 # Arquivos objeto e units compiladas
@@ -117,7 +118,6 @@ nppBackup/
 # =============================================================================
 
 # Artefatos de empacotamento
-dist/
 release/
 *.zip
 *.tar.gz
