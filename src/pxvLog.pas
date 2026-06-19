@@ -1,7 +1,7 @@
 unit pxvLog;
 
 { Simple append-to-file logger.
-  Log file is written next to the executable: <exedir>/log.txt
+  Log file is written next to the executable: <exedir>/pxView.log
 }
 
 {$mode objfpc}{$H+}
